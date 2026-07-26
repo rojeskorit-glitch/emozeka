@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Roblox Studio Luau Kodlayıcı</title>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .chat-container { width: 800px; height: 85vh; background: #1e293b; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #00a2ff, #0055ff); padding: 18px; text-align: center; }
+        .header h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+        .header p { margin: 4px 0 0 0; font-size: 13px; opacity: 0.9; }
+        .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #0f172a; }
+        .message { padding: 14px 18px; border-radius: 8px; max-width: 88%; line-height: 1.6; word-break: break-word; white-space: pre-wrap; font-size: 14px; }
+        .user { background: #0066ff; align-self: flex-end; color: white; border-bottom-right-radius: 2px; }
+        .assistant { background: #1e293b; align-self: flex-start; color: #f8fafc; border: 1px solid #334155; border-bottom-left-radius: 2px; }
+        .input-area { padding: 15px; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; }
+        input[type="text"] { flex: 1; padding: 14px; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: white; outline: none; font-size: 14px; }
+        input[type="text"]:focus { border-color: #00a2ff; }
+        button.send-btn { padding: 0 25px; background: #00a2ff; border: none; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+        button.send-btn:hover { background: #0088cc; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <h2>Roblox Luau Kodlayıcı</h2>
+            <p>Eksiksiz Sistem ve Script Üreticisi</p>
+        </div>
+
+        <div class="chat-box" id="chatBox">
+            <div class="message assistant">Ne tür bir Roblox sistemi yazmak istiyorsun? Sistemi yaz, sana ServerScript, LocalScript, UI ve Remote yapılarını eksiksiz hazırlayayım.</div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Örn: Roblox üzerinde FiveM tarzı araç spawner sistemi oluştur..." onkeypress="checkEnter(event)">
+            <button class="send-btn" onclick="sendMessage()">Gönder</button>
+        </div>
+    </div>
+
+    <script>
+        function checkEnter(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const chatBox = document.getElementById('chatBox');
+            const text = input.value.trim();
+            if (!text) return;
+
+            chatBox.innerHTML += `<div class="message user">${escapeHtml(text)}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const loadingId = 'loading-' + Date.now();
+            chatBox.innerHTML += `<div class="message assistant" id="${loadingId}">Sistem ve Luau kodları sıfırdan eksiksiz oluşturuluyor...</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/chat-api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await response.json();
+                
+                document.getElementById(loadingId).remove();
+
+                if (data.assistant) {
+                    chatBox.innerHTML += `<div class="message assistant">${escapeHtml(data.assistant)}</div>`;
+                } else {
+                    chatBox.innerHTML += `<div class="message assistant" style="color:#ef4444;">Hata: ${data.error}</div>`;
+                }
+            } catch (err) {
+                document.getElementById(loadingId).remove();
+                chatBox.innerHTML += `<div class="message assistant" style="color:#ef4444;">Bağlantı hatası oluştu.</div>`;
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
