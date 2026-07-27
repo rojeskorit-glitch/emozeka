@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>EmoZeka - Kanka Modu</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #0b0f19; height: 100vh; display: flex; flex-direction: column; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background: #131a29; border-bottom: 2px solid #ff3366; }
+        .logo { font-weight: 900; font-size: 24px; background: linear-gradient(45deg, #ff3366, #ff9933); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .chat-container { flex: 1; overflow-y: auto; padding: 20px; max-height: 60vh; background: #111827; border-radius: 12px; border: 1px solid #1f2937; }
+        .message { margin-bottom: 15px; max-width: 80%; padding: 12px 16px; border-radius: 15px; }
+        .user-message { background: #ff3366; color: white; margin-left: auto; border-bottom-right-radius: 2px; }
+        .bot-message { background: #1f2937; color: #f3f4f6; margin-right: auto; border-bottom-left-radius: 2px; border-left: 4px solid #ff9933; }
+        .speak-btn { background: none; border: none; cursor: pointer; font-size: 14px; margin-left: 8px; color: #38bdf8; }
+        #imagePreview { max-width: 100px; display: none; margin-bottom: 5px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark px-4 shadow-lg d-flex justify-content-between align-items-center">
+        <div class="logo">⚡ EMOZEKA AI</div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-success btn-sm fw-bold" onclick="newChat()">➕ Yeni Sohbet</button>
+            <button id="audioToggleBtn" class="btn btn-outline-info btn-sm fw-bold" onclick="toggleAudio()">🔊 Ses: Açık</button>
+            <button class="btn btn-outline-danger btn-sm fw-bold" onclick="logout()">Çıkış Yap</button>
+        </div>
+    </nav>
+
+    <div class="container my-4 flex-grow-1 d-flex flex-column" style="max-width: 800px;">
+        <div id="chatBox" class="chat-container shadow-sm mb-3">
+            <div class="message bot-message">Ooo kanka hoş geldin! Otur soluklan, ne kaynatıyoruz bugün? 😎</div>
+        </div>
+
+        <div>
+            <img id="imagePreview" src="" alt="Önizleme">
+        </div>
+
+        <div class="input-group mb-3">
+            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="previewImage(event)">
+            <button class="btn btn-outline-warning" type="button" onclick="document.getElementById('imageInput').click()" title="Fotoğraf Yükle">📷</button>
+            <input type="text" id="userInput" class="form-control bg-dark text-white border-secondary" placeholder="Mesaj yaz veya 'foto oluştur [açıklama]' yaz kanka..." autofocus>
+            <button class="btn btn-danger fw-bold px-4" type="button" onclick="sendMessage()">Gönder</button>
+        </div>
+    </div>
+
+    <script>
+        let base64Image = null;
+        let soundEnabled = true;
+
+        function newChat() {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML = `<div class="message bot-message">Yeni sayfayı açtık kanka, dök içini dinliyorum! ⚡</div>`;
+            window.speechSynthesis.cancel();
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('audioToggleBtn');
+            if (soundEnabled) {
+                btn.innerText = "🔊 Ses: Açık";
+                btn.className = "btn btn-outline-info btn-sm fw-bold";
+            } else {
+                btn.innerText = "🔇 Ses: Kapalı";
+                btn.className = "btn btn-outline-secondary btn-sm fw-bold";
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    base64Image = e.target.result;
+                    const preview = document.getElementById('imagePreview');
+                    preview.src = base64Image;
+                    preview.style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function speakText(text) {
+            if (!soundEnabled) return;
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'tr-TR';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        async function sendMessage() {
+            const inputField = document.getElementById('userInput');
+            const chatBox = document.getElementById('chatBox');
+            const messageText = inputField.value.trim();
+
+            if (!messageText && !base64Image) return;
+
+            let userHtml = `<div class="message user-message">`;
+            if (base64Image) {
+                userHtml += `<img src="${base64Image}" style="max-width:150px; border-radius:5px; display:block; margin-bottom:5px;">`;
+            }
+            userHtml += `${messageText || "Fotoğraf attı"}</div>`;
+            chatBox.innerHTML += userHtml;
+
+            const currentImg = base64Image;
+            inputField.value = '';
+            base64Image = null;
+            document.getElementById('imagePreview').style.display = 'none';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const botMsgId = 'bot-' + Date.now();
+            chatBox.innerHTML += `<div id="${botMsgId}" class="message bot-message">Düşünüyor kanka...</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: messageText, image: currentImg })
+                });
+                const data = await response.json();
+                let replyHtml = data.reply;
+
+                if (data.generated_image) {
+                    replyHtml += `<br><img src="${data.generated_image}" style="max-width:100%; border-radius:10px; margin-top:10px;" alt="Oluşturulan Görsel">`;
+                }
+
+                document.getElementById(botMsgId).innerHTML = `
+                    ${replyHtml}
+                    <button class="speak-btn" onclick="speakText('${data.reply.replace(/'/g, "\\'")}')" title="Sesli Dinle">🔊 Dinle</button>
+                `;
+                speakText(data.reply);
+            } catch (error) {
+                document.getElementById(botMsgId).innerText = "Hata patladı kanka!";
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function logout() {
+            fetch('/logout').then(() => { window.location.href = '/login'; });
+        }
+
+        document.getElementById('userInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') { sendMessage(); }
+        });
+    </script>
+</body>
+</html>
